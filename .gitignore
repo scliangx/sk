@@ -1,0 +1,10 @@
+/target/
+**/*.rs.bk
+*.pdb
+*.exe
+.idea/
+.vscode/
+*.swp
+.DS_Store
+.claude/
+DESIGN.md
