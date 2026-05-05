@@ -28,16 +28,19 @@ pub enum OutputFormat {
     about = "SSH Key Manager — one command for passwordless SSH",
     long_about = "Without a subcommand, sk connects to a server:\n  sk <name>        → connect to configured server\n  sk <user@host>    → ad-hoc connection\n\nUse subcommands to manage servers: add, list, remove, test, import, export.",
     after_help = "Examples:\n  sk prod\n  sk root@10.0.0.1\n  sk add prod -H 10.0.0.1 -u admin -p secret\n  sk list",
-    disable_help_subcommand = true
+    disable_help_subcommand = true,
+    subcommand_required = false
 )]
 pub struct Cli {
-    /// 详细输出模式
     #[arg(short = 'v', long, global = true, help = "Enable verbose output")]
     pub verbose: bool,
 
-    /// JSON 格式输出
     #[arg(short = 'j', long, global = true, help = "Output in JSON format")]
     pub json: bool,
+
+    /// 连接目标（不与子命令同时使用）
+    #[arg(required = false, help = "Server name or user@host[:port] to connect to")]
+    pub target: Option<String>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,

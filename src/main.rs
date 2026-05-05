@@ -69,11 +69,7 @@ fn main() {
             Ok(())
         }
         None => {
-            // 无子命令 = 连接模式：从原始参数中提取目标
-            let target = std::env::args()
-                .skip(1)
-                .find(|a| !a.starts_with('-'))
-                .unwrap_or_default();
+            let target = cli.target.as_deref().unwrap_or("");
             if target.is_empty() {
                 Cli::parse_from(["sk", "--help"]);
                 let marker = "# sk completion";
@@ -82,7 +78,7 @@ fn main() {
                 }
                 process::exit(0);
             }
-            cli::connect::run(Some(&target), fmt, verbose)
+            cli::connect::run(Some(target), fmt, verbose)
         }
     };
 
