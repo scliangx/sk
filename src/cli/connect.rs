@@ -75,17 +75,17 @@ pub fn run(
     Ok(())
 }
 
-/// 解析连接目标：优先查找已配置的服务器，否则按 user@host[:port] 解析
+/// 解析连接目标：名称查找 → user@host 匹配已存储 → 直连
 fn resolve_target(
     target: &str,
     output: &Output,
 ) -> SkResult<crate::domain::config::model::Server> {
-    // 1. 尝试作为服务器名称查找
+    // 1. 作为服务器名称查找
     if let Ok(Some(server)) = Orchestrator::get_server(target) {
         return Ok(server);
     }
 
-    // 2. 尝试解析 user@host[:port] 格式
+    // 2. user@host[:port] 格式：查找已配置的服务器（匹配 user+host）
     if target.contains('@') {
         let (user, host_part) = target.split_once('@').unwrap();
         let (host, port) = if let Some((h, p)) = host_part.split_once(':') {
@@ -98,6 +98,15 @@ fn resolve_target(
             return Err(SkError::InvalidArgument(
                 "Invalid format. Use: sk <name> or sk <user@host>".into(),
             ));
+        }
+
+        // 查找 user+host 匹配的已配置服务器（复用存储的密码）
+        let all = crate::domain::config::store::load_all().unwrap_or_default();
+        if let Some(matched) = all.iter().find(|s| s.user == user && s.host == host && s.port == port)
+        {
+            return Orchestrator::get_server(&matched.name)?.ok_or_else(|| {
+                SkError::Config(format!("Server '{}' not found", matched.name))
+            });
         }
 
         output.info(&format!("Connecting to {}@{}:{}...", user, host, port));
