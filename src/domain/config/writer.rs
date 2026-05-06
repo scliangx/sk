@@ -18,15 +18,15 @@ use crate::infra::fs;
 /// sk 管理标记 — 写入到 Host 块的首行注释中
 const SK_MANAGED_MARKER: &str = "# sk managed";
 
-/// SSH Config 写入器
-///
-/// 提供对 SSH config 文件的原子写入操作。
+/// SSH Config 写入器（legacy，用于 export --to-ssh）
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct SshConfigWriter {
     /// SSH config 文件路径
     path: PathBuf,
 }
 
+#[allow(dead_code)]
 impl SshConfigWriter {
     /// 使用默认路径（~/.ssh/config）创建写入器
     pub fn default_path() -> SkResult<Self> {
@@ -72,7 +72,7 @@ impl SshConfigWriter {
     /// 使用文件锁 + 原子写入确保安全。
     pub fn append(&self, server: &Server) -> SkResult<()> {
         // 确保 SSH 目录存在
-        fs::init_ssh_env()?;
+        fs::init_sk_env()?;
 
         // 获取文件锁
         let lock = fs::FileLock::new(&self.path);

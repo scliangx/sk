@@ -59,13 +59,14 @@ dialoguer = "0.11"
 chrono = { version = "0.4", features = ["serde"] }
 
 # 异步运行时（批量并发操作时使用）
-tokio = { version = "1", features = ["rt-multi-thread", "time", "net", "macros"], optional = true }
+tokio = { version = "1", features = ["rt", "time", "net", "macros"] }
 
 # CSV 批量导入
 csv = "1"
 ssh-key = { version = "0.6.7", features = ["ed25519"] }
 clap_complete = "4.6.3"
 crossterm = "0.29.0"
+clap-dyn-autocomplete = "0.1.1"
 
 [dev-dependencies]
 tempfile = "3"
@@ -79,8 +80,8 @@ default = ["ssh2-backend", "keyring-backend"]
 ssh2-backend = ["dep:ssh2"]
 # 使用系统钥匙串存储密码
 keyring-backend = ["dep:keyring"]
-# 异步支持（批量并发操作）
-async-backend = ["dep:tokio"]
+# 异步运行时（批量并发+动态补全）
+async-backend = []
 
 [profile.release]
 opt-level = "z"     # 优化体积

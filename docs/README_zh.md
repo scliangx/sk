@@ -20,7 +20,7 @@
 - **连接验证** — 每次 `sk add` 先测试连接，不可达的服务器拒绝添加
 - **原生 SSH 协议** — 核心操作不依赖外部 `ssh` 二进制（使用 ssh2 / libssh2）
 - **安全存储** — 密码存储在系统钥匙串（macOS 钥匙串 / Windows 凭据管理器 / Linux Secret Service），AES-256-GCM 加密文件降级
-- **SSH config 兼容** — 读写标准 `~/.ssh/config`，可直接使用 `ssh` 命令
+- **SSH config 兼容** — 数据存储在 `~/.sk/`，可通过 `import`/`export` 与 `~/.ssh/config` 同步
 - **跨平台** — macOS、Linux、Windows
 
 ---
@@ -184,13 +184,14 @@ sk batch add servers.csv -c 8 # 并发数
 ## 工作原理
 
 ```
-~/.ssh/
-├── config              # 标准 SSH 配置（sk 读写 Host 块）
 ~/.sk/
+├── servers.yaml        # 主数据存储（所有服务器配置）
 ├── metadata.yaml       # 服务器元数据
 ├── passwords/          # AES-256-GCM 加密密码 (*.enc)
 └── keys/               # ED25519 密钥对 (name_key, name_key.pub)
 ```
+
+> sk 不修改 `~/.ssh/config`。使用 `sk import` 拉取 SSH 配置，或 `sk export --to-ssh` 写回。
 
 **密码存储流程：**
 1. 系统钥匙串（macOS Keychain / Windows Credential Manager / Linux Secret Service）

@@ -15,4 +15,4 @@ pub mod batch;
 pub mod sync;
 pub mod completion;
 pub mod doctor;
-pub mod complete_servers;
+pub mod custom_complete;

@@ -1,93 +1,62 @@
-//! Shell 自动补全 — 生成脚本 + 一键安装
+//! Shell 补全（clap-dyn-autocomplete）
 //!
-//! `sk completion`      → 自动检测 shell 并安装
-//! `sk completion bash` → 输出 bash 补全脚本
+//! 动态补全：sk <Tab> → 服务器名称 / 子命令 / 参数
+//!
+//! sk completion install → 自动检测 shell 并安装
 
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
-use clap::CommandFactory;
-use clap_complete::{generate, Shell};
+use clap_dyn_autocomplete::{emit_completion_stub, Shell};
 
-use crate::cli::args::Cli;
 use crate::error::SkResult;
+
+const MARKER: &str = "# sk completion";
 
 pub fn run(shell: Option<&str>) -> SkResult<()> {
     match shell {
         None | Some("install") => install(),
         Some("uninstall") => uninstall(),
-        Some("bash") => completion_bash(),
-        Some("zsh") => completion_zsh(),
-        Some("fish") => completion_fish(),
-        Some("powershell") | Some("pwsh") => completion_powershell(),
-        _ => {
-            eprintln!("Unsupported shell. Use: bash, zsh, fish, powershell, install, uninstall");
-        }
+        Some("powershell") | Some("pwsh") => emit_stub(Shell::Powershell),
+        Some("zsh") => emit_stub(Shell::Zsh),
+        Some("fish") => emit_stub(Shell::Fish),
+        Some("bash") => emit_bash(),
+        Some("elvish") => emit_elvish(),
+        _ => eprintln!("Supported: bash, zsh, fish, powershell, elvish, install, uninstall"),
     }
     Ok(())
 }
 
-// ===== 自动安装 =====
+fn emit_stub(shell: Shell) {
+    emit_completion_stub(shell, "sk", "__complete", &mut std::io::stdout()).ok();
+}
+
+// ===== 安装/卸载 =====
 
 fn install() {
-    let shell = detect_shell();
-    let (script, rc_path) = match shell.as_str() {
-        "powershell" | "pwsh" => {
-            let script = build_powershell_script();
-            let profile = std::env::var("PROFILE").unwrap_or_else(|_| {
-                let home = dirs::home_dir().map(|p| p.display().to_string()).unwrap_or_default();
-                format!("{}\\Documents\\PowerShell\\Microsoft.PowerShell_profile.ps1", home)
-            });
-            (script, PathBuf::from(profile))
-        }
-        "bash" => {
-            let rc = dirs::home_dir().map(|h| h.join(".bashrc")).unwrap_or_else(|| PathBuf::from(".bashrc"));
-            (build_bash_script(), rc)
-        }
-        "zsh" => {
-            let rc = dirs::home_dir().map(|h| h.join(".zshrc")).unwrap_or_else(|| PathBuf::from(".zshrc"));
-            (build_zsh_script(), rc)
-        }
-        "fish" => {
-            let rc = dirs::home_dir()
-                .map(|h| h.join(".config/fish/config.fish"))
-                .unwrap_or_else(|| PathBuf::from("config.fish"));
-            (build_fish_script(), rc)
-        }
-        _ => {
-            eprintln!("Could not detect shell. Specify manually: sk completion <bash|zsh|fish|powershell>");
+    let (shell, rc_path) = detect_shell_rc();
+    let mut buf = Vec::new();
+    emit_completion_stub(shell.clone(), "sk", "__complete", &mut buf).ok();
+    let script = String::from_utf8_lossy(&buf);
+
+    if let Some(parent) = rc_path.parent() {
+        if !parent.exists() {
+            println!("Directory {} does not exist.", parent.display());
+            println!("Create it first, or install manually:");
+            println!("  sk completion {} | Out-String | Invoke-Expression  (current session)", shell_name_to_str(shell.clone()));
             return;
         }
-    };
+    }
 
-    // 检查是否已安装
-    let marker = "# sk completion";
     if let Ok(existing) = fs::read_to_string(&rc_path) {
-        if existing.contains(marker) {
+        if existing.contains(MARKER) {
             println!("✅ Completion already installed in {}", rc_path.display());
             return;
         }
     }
 
-    // 检查父目录是否存在
-    if let Some(parent) = rc_path.parent() {
-        if !parent.exists() {
-            println!("The directory {} does not exist.", parent.display());
-            if shell == "powershell" {
-                println!("PowerShell profile directory not found — PowerShell may not have been started yet.");
-                println!("Open PowerShell once to create it, or install manually:");
-            } else {
-                println!("Create it first (mkdir -p {}), or install manually:", parent.display());
-            }
-            println!("  sk completion {} | Out-String | Invoke-Expression  (current session only)", shell);
-            println!("  sk completion {}  (print script)", shell);
-            return;
-        }
-    }
-
-    // 追加到 rc 文件
-    let content = format!("\n{}\n{}\n", marker, script);
+    let content = format!("\n{}\n{}\n", MARKER, script);
     match fs::OpenOptions::new().create(true).append(true).open(&rc_path) {
         Ok(mut f) => {
             let _ = f.write_all(content.as_bytes());
@@ -95,137 +64,81 @@ fn install() {
             println!("   Restart your shell or run: . {}", rc_path.display());
         }
         Err(e) => {
-            eprintln!("❌ Cannot write to {}: {}", rc_path.display(), e);
-            println!("   Install manually: sk completion {} > {}  (append to your rc file)", shell, rc_path.display());
+            eprintln!("❌ Cannot write: {}", e);
+            println!("   Manual: sk completion powershell >> $PROFILE");
         }
     }
 }
-
-fn detect_shell() -> String {
-    // PowerShell detection (works cross-platform)
-    if std::env::var("PSModulePath").is_ok()
-        || std::env::var("PROFILE").is_ok()
-        || std::env::var("POWERSHELL_VERSION").is_ok()
-    {
-        return "powershell".into();
-    }
-    // Unix shell detection
-    if let Ok(s) = std::env::var("SHELL") {
-        if s.contains("zsh") { return "zsh".into(); }
-        if s.contains("fish") { return "fish".into(); }
-        if s.contains("bash") { return "bash".into(); }
-    }
-    // Default per platform
-    if cfg!(windows) { "powershell" } else { "bash" }.into()
-}
-
-// ===== 卸载 =====
-
-const MARKER: &str = "# sk completion";
 
 fn uninstall() {
     let rc_paths = get_rc_paths();
     let mut removed = false;
-
     for rc_path in &rc_paths {
-        match fs::read_to_string(rc_path) {
-            Ok(content) if content.contains(MARKER) => {
-                let cleaned: String = content
-                    .lines()
-                    .take_while(|line| !line.contains(MARKER))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-
-                if let Err(e) = fs::write(rc_path, cleaned) {
-                    eprintln!("❌ Cannot update {}: {}", rc_path.display(), e);
-                } else {
-                    println!("✅ Completion removed from {}", rc_path.display());
+        if let Ok(content) = fs::read_to_string(rc_path) {
+            if content.contains(MARKER) {
+                let cleaned: String = content.lines().take_while(|l| !l.contains(MARKER)).collect::<Vec<_>>().join("\n");
+                if fs::write(rc_path, cleaned).is_ok() {
+                    println!("✅ Removed from {}", rc_path.display());
                     removed = true;
                 }
             }
-            _ => {}
         }
     }
-
     if !removed {
-        eprintln!("No sk completion found in checked files:");
-        for p in &rc_paths {
-            eprintln!("  - {}", p.display());
+        eprintln!("No completion found in:");
+        for p in &rc_paths { eprintln!("  - {}", p.display()); }
+    }
+}
+
+fn detect_shell_rc() -> (Shell, PathBuf) {
+    if std::env::var("PSModulePath").is_ok() || std::env::var("PROFILE").is_ok() {
+        let profile = std::env::var("PROFILE").unwrap_or_else(|_| {
+            dirs::home_dir().map(|h| h.join("Documents/PowerShell/Microsoft.PowerShell_profile.ps1").display().to_string()).unwrap_or_default()
+        });
+        return (Shell::Powershell, PathBuf::from(profile));
+    }
+    if let Ok(s) = std::env::var("SHELL") {
+        if s.contains("zsh") { return (Shell::Zsh, dirs::home_dir().unwrap_or_default().join(".zshrc")); }
+        if s.contains("fish") { return (Shell::Fish, dirs::home_dir().unwrap_or_default().join(".config/fish/config.fish")); }
+        if s.contains("bash") {
+            println!("Bash auto-install not supported. Run: sk completion bash >> ~/.bashrc");
+            std::process::exit(0);
         }
     }
+    (Shell::Powershell, PathBuf::from("profile.ps1"))
 }
 
 fn get_rc_paths() -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    let home = dirs::home_dir();
-
-    if cfg!(windows) {
-        if let Ok(p) = std::env::var("PROFILE") { paths.push(p.into()); }
-    }
-    if let Some(h) = &home {
-        paths.push(h.join(".bashrc"));
-        paths.push(h.join(".zshrc"));
-        paths.push(h.join(".config/fish/config.fish"));
-    }
-    paths
+    let mut v = Vec::new();
+    if let Ok(p) = std::env::var("PROFILE") { v.push(p.into()); }
+    if let Some(h) = dirs::home_dir() { v.push(h.join(".zshrc")); v.push(h.join(".config/fish/config.fish")); }
+    v
 }
 
-// ===== 各 shell 补全脚本 =====
-
-fn build_bash_script() -> String {
-    let mut buf = Vec::new();
-    write_clap_completion(Shell::Bash, &mut buf);
-    let base = String::from_utf8_lossy(&buf);
-    format!("{}\n{}\n{}", base,
-        r#"_sk_servers() { local cur="$1"; local s; s=$(sk __complete-servers "$cur" 2>/dev/null | cut -f1); COMPREPLY=($(compgen -W "$s" -- "$cur")); }"#,
-        r#"complete -F _sk_servers -o default sk"#)
+fn shell_name_to_str(s: Shell) -> &'static str {
+    match s { Shell::Powershell => "powershell", Shell::Zsh => "zsh", Shell::Fish => "fish" }
 }
 
-fn build_zsh_script() -> String {
-    let mut buf = Vec::new();
-    write_clap_completion(Shell::Zsh, &mut buf);
-    let base = String::from_utf8_lossy(&buf);
-    format!("{}\n{}\n{}", base,
-        r#"_sk_servers() { local -a s; s=(${(f)"$(sk __complete-servers 2>/dev/null | cut -f1)"}); _describe 'server' s; }"#,
-        r#"compdef _sk_servers sk 2>/dev/null"#)
+// ===== Bash (clap_complete + 动态补全) =====
+
+fn emit_bash() {
+    use clap::CommandFactory;
+    use clap_complete::{generate, Shell as ClapShell};
+    let mut cmd = crate::cli::args::Cli::command();
+    generate(ClapShell::Bash, &mut cmd, "sk", &mut std::io::stdout());
+    println!(r#"
+_sk_servers() {{
+    local cur="$1"
+    local s=$(sk __complete-servers "$cur" 2>/dev/null | cut -f1)
+    COMPREPLY=($(compgen -W "$s" -- "$cur"))
+}}
+complete -F _sk_servers -o default sk
+"#);
 }
 
-fn build_fish_script() -> String {
-    let mut buf = Vec::new();
-    write_clap_completion(Shell::Fish, &mut buf);
-    let base = String::from_utf8_lossy(&buf);
-    format!("{}\n{}", base,
-        r#"complete -c sk -n "not __fish_seen_subcommand_from add remove list test import export batch sync completion doctor" -a "(sk __complete-servers 2>/dev/null | cut -f1)" -d Server"#)
-}
-
-fn build_powershell_script() -> String {
-    let mut buf = Vec::new();
-    write_clap_completion(Shell::PowerShell, &mut buf);
-    let base = String::from_utf8_lossy(&buf);
-    format!("{}\n{}", base, r#"
-Register-ArgumentCompleter -CommandName sk -ScriptBlock {
-    param($wordToComplete, $commandAst)
-    $subs = @('add','a','remove','rm','list','ls','test','t','import','export','batch','sync','completion','doctor')
-    if ($commandAst.CommandElements.Count -gt 1) {
-        if ($subs -contains $commandAst.CommandElements[1].Value) { return }
-    }
-    sk __complete-servers $wordToComplete 2>$null | ForEach-Object {
-        $p = $_ -split "\t"
-        [System.Management.Automation.CompletionResult]::new($p[0], $p[0], 'ParameterValue', $p[1])
-    }
-}
-"#)
-}
-
-// ===== 单独输出 =====
-
-fn completion_bash()   { println!("{}", build_bash_script()); }
-fn completion_zsh()    { println!("{}", build_zsh_script()); }
-fn completion_fish()   { println!("{}", build_fish_script()); }
-fn completion_powershell() { println!("{}", build_powershell_script()); }
-
-fn write_clap_completion(shell: Shell, w: &mut dyn Write) {
-    let mut cmd = Cli::command();
-    let name = cmd.get_name().to_string();
-    generate(shell, &mut cmd, &name, w);
+fn emit_elvish() {
+    use clap::CommandFactory;
+    use clap_complete::{generate, Shell as ClapShell};
+    let mut cmd = crate::cli::args::Cli::command();
+    generate(ClapShell::Elvish, &mut cmd, "sk", &mut std::io::stdout());
 }

@@ -32,7 +32,12 @@ pub fn sk_dir() -> SkResult<PathBuf> {
     Ok(home.join(".sk"))
 }
 
-/// 获取 sk 元数据文件路径 ~/.ssh/sk/metadata.yaml
+/// 获取 sk 服务器配置文件 ~/.sk/servers.yaml
+pub fn sk_servers_path() -> SkResult<PathBuf> {
+    Ok(sk_dir()?.join("servers.yaml"))
+}
+
+/// 获取 sk 元数据文件路径 ~/.sk/metadata.yaml
 pub fn sk_metadata_path() -> SkResult<PathBuf> {
     Ok(sk_dir()?.join("metadata.yaml"))
 }
@@ -158,26 +163,25 @@ pub fn atomic_write(path: &Path, content: &str) -> SkResult<()> {
     Ok(())
 }
 
-/// 文件锁
-///
-/// 使用简单的临时锁文件实现，跨平台兼容。
-/// 写入前获取锁，写入后释放。
+/// 文件锁（用于 SshConfigWriter）
+#[allow(dead_code)]
 pub struct FileLock {
     lock_path: PathBuf,
 }
 
+#[allow(dead_code)]
 impl FileLock {
     /// 创建文件锁（不获取）
+    #[allow(dead_code)]
     pub fn new(target_path: &Path) -> Self {
         let lock_path = target_path.with_extension("lock");
         Self { lock_path }
     }
 
-    /// 获取锁（总是删除旧锁并创建新锁，单进程使用足够安全）
+    /// 获取锁
+    #[allow(dead_code)]
     pub fn acquire(&self) -> SkResult<()> {
         let _ = fs::remove_file(&self.lock_path);
-
-        // 创建锁文件
         let pid = std::process::id();
         fs::write(&self.lock_path, pid.to_string()).map_err(|e| {
             SkError::FileWrite {
@@ -185,11 +189,11 @@ impl FileLock {
                 reason: format!("Cannot create lock file: {}", e),
             }
         })?;
-
         Ok(())
     }
 
     /// 释放锁
+    #[allow(dead_code)]
     pub fn release(&self) {
         let _ = fs::remove_file(&self.lock_path);
     }
@@ -229,9 +233,8 @@ pub fn read_file(path: &Path) -> SkResult<String> {
 
 /// 初始化 SSH 环境
 ///
-/// 确保 ~/.ssh/ 和 ~/.sk/ 子目录结构存在。
-pub fn init_ssh_env() -> SkResult<()> {
-    ensure_dir(&ssh_dir()?)?;
+/// 确保 ~/.sk/ 子目录结构存在。
+pub fn init_sk_env() -> SkResult<()> {
     ensure_dir(&sk_dir()?)?;
     ensure_dir(&sk_keys_dir()?)?;
     ensure_dir(&sk_passwords_dir()?)?;

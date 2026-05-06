@@ -158,8 +158,7 @@ pub fn run(
 
     let name_owned = name.to_string();
     tx.on_rollback(move || {
-        let w = crate::domain::config::writer::SshConfigWriter::default_path()?;
-        let _ = w.remove(&name_owned);
+        let _ = crate::domain::config::store::remove(&name_owned);
         Ok(())
     });
 

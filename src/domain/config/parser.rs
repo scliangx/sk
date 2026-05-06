@@ -40,6 +40,7 @@ pub struct SshConfigParser {
 
 impl SshConfigParser {
     /// 使用默认路径（~/.ssh/config）创建解析器
+    #[allow(dead_code)]
     pub fn default_path() -> SkResult<Self> {
         Ok(Self {
             path: fs::ssh_config_path()?,

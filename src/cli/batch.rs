@@ -34,7 +34,7 @@ pub fn run(
     }
 
     // 确保数据目录存在
-    crate::infra::fs::init_ssh_env()?;
+    crate::infra::fs::init_sk_env()?;
 
     let total = records.len();
     output.info(&format!("Importing {} server(s)...", total));

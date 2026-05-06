@@ -5,7 +5,6 @@
 
 use serde::Serialize;
 
-use crate::domain::config::parser::SshConfigParser;
 use crate::error::{SkError, SkResult};
 
 /// 导出格式
@@ -43,8 +42,7 @@ pub struct Exporter;
 impl Exporter {
     /// 导出所有服务器配置
     pub fn export_all(format: ExportFormat) -> SkResult<String> {
-        let parser = SshConfigParser::default_path()?;
-        let servers = parser.parse()?;
+        let servers = crate::domain::config::store::load_all()?;
         let metadata = crate::domain::config::metadata::MetadataManager::load_default()?;
 
         let entries: Vec<ExportEntry> = servers

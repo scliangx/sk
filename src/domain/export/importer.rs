@@ -47,25 +47,24 @@ impl Importer {
         Self::import_file(&path)
     }
 
-    /// 将导入的服务器批量写入 sk 管理的配置
+    /// 将导入的服务器批量写入 sk store
     ///
     /// 跳过已存在的同名服务器。
     pub fn add_to_managed(servers: &[Server], force: bool) -> SkResult<(usize, usize)> {
-        let writer = crate::domain::config::writer::SshConfigWriter::default_path()?;
         let mut meta = crate::domain::config::metadata::MetadataManager::load_default()?;
         let mut added = 0;
         let mut skipped = 0;
 
         for server in servers {
-            if writer.exists(&server.name)? {
+            if crate::domain::config::store::exists(&server.name)? {
                 if force {
-                    writer.update(&server.name, server)?;
+                    crate::domain::config::store::add(server)?;
                     added += 1;
                 } else {
                     skipped += 1;
                 }
             } else {
-                writer.append(server)?;
+                crate::domain::config::store::add(server)?;
                 meta.upsert_server(&server.name, false, "none");
                 added += 1;
             }

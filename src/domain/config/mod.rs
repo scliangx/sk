@@ -4,6 +4,7 @@
 //! 支持 Host 块的解析、追加、删除、更新。
 
 pub mod model;
+pub mod store;
 pub mod parser;
 pub mod writer;
 pub mod metadata;

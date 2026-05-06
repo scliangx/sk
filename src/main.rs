@@ -18,6 +18,17 @@ use std::fs;
 use std::process;
 
 fn main() {
+    // __complete 子命令由 clap-dyn-autocomplete 处理，不经过主 CLI
+    if std::env::args().nth(1).as_deref() == Some("__complete") {
+        let rt = tokio::runtime::Builder::new_current_thread().enable_time().build().unwrap();
+        rt.block_on(async {
+            use clap_dyn_autocomplete::Complete;
+            let c = Complete::parse();
+            c.println_to_stub_script::<Cli>(None, cli::custom_complete::SkCompleterFactory).await;
+        });
+        return;
+    }
+
     let cli = Cli::parse();
 
     let fmt = if cli.json {
@@ -51,7 +62,12 @@ fn main() {
             cli::export_cmd::run(output.as_deref(), format, fmt, verbose)
         }
         Some(Commands::CompleteServers { prefix }) => {
-            cli::complete_servers::run(prefix.as_deref())
+            for s in domain::config::store::load_all().unwrap_or_default() {
+                if prefix.as_ref().map_or(true, |p| s.name.starts_with(p)) {
+                    println!("{}\tconfigured", s.name);
+                }
+            }
+            Ok(())
         }
         Some(Commands::Completion { shell }) => {
             cli::completion::run(shell.as_deref())

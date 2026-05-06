@@ -20,7 +20,7 @@
 - **Connection verification** — every `sk add` tests the connection before saving
 - **SSH protocol native** — no external `ssh` binary dependency for core operations (uses `ssh2` / libssh2)
 - **Secure storage** — passwords stored in system keychain (macOS Keychain / Windows Credential Manager / Linux Secret Service) with AES-256-GCM encrypted file fallback
-- **SSH config compatible** — reads and writes standard `~/.ssh/config`, works with plain `ssh`
+- **SSH config compatible** — stores data in `~/.sk/`, can import from / export to `~/.ssh/config`
 - **Cross-platform** — macOS, Linux, Windows
 
 ---
@@ -81,7 +81,7 @@ Authentication priority: stored password → IdentityFile key → ssh-agent → 
 ### `sk add` — Add Server
 
 ```
-sk add <name> -H <host> -u <user> -p <password> [-P 2222] [-i ~/.ssh/key]
+sk add <name> -H <host> -u <user> -p <password> [-P 2222] [-i ~/.sk/keys/key]
 sk add <name> -H <host> -u <user> -k                # key-based setup
 ```
 
@@ -184,13 +184,14 @@ sk batch add servers.csv -c 8  # concurrency
 ## How It Works
 
 ```
-~/.ssh/
-├── config              # Standard SSH config (sk writes Host blocks)
 ~/.sk/
-├── metadata.yaml       # server metadata
+├── servers.yaml        # Primary data store (all server configs)
+├── metadata.yaml       # Server metadata (created_at, password_stored)
 ├── passwords/          # AES-256-GCM encrypted passwords (*.enc)
 └── keys/               # ED25519 key pairs (name_key, name_key.pub)
 ```
+
+> sk does NOT touch `~/.ssh/config`. Use `sk import` to pull from SSH config, or `sk export --to-ssh` to write back.
 
 **Password storage flow:**
 1. System keychain (macOS Keychain / Windows Credential Manager / Linux Secret Service)

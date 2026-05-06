@@ -136,7 +136,7 @@ pub enum Commands {
         format: String,
     },
 
-    /// Shell 补全: 返回服务器名称列表
+    /// 补全: 服务器名称列表（bash 使用）
     #[command(name = "__complete-servers", hide = true)]
     CompleteServers {
         #[arg(required = false)]

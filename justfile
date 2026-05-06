@@ -30,9 +30,9 @@ stop-ssh:
     -podman stop {{CONTAINER_NAME}}
     -podman rm {{CONTAINER_NAME}}
 
-# 生成测试密钥对并推送到容器 (单行: powershell 变量不跨行共享)
+# 生成测试密钥对并推送到容器
 setup-key:
-    $k = "$env:USERPROFILE\.sk\keys\{{SERVER_NAME}}_key"; mkdir -Force (Split-Path $k) *>$null; ssh-keygen -t ed25519 -f $k -N '""' -C "sk-e2e" -q 2>$null; type "$k.pub" | podman exec -i {{CONTAINER_NAME}} bash -c "cat >> /home/{{SSH_USER}}/.ssh/authorized_keys"
+    $k = "$env:USERPROFILE\.sk\keys\{{SERVER_NAME}}_key"; rm -Force $k, "$k.pub" *>$null; mkdir -Force (Split-Path $k) *>$null; ssh-keygen -t ed25519 -f $k -N '""' -C "sk-e2e" -q 2>$null; type "$k.pub" | podman exec -i {{CONTAINER_NAME}} bash -c "cat >> /home/{{SSH_USER}}/.ssh/authorized_keys"
 
 # ---- 单元测试 ----
 test-unit:
@@ -85,16 +85,12 @@ test-remove-withkey:
 # =============================================================================
 
 test-import: build
-    @"`nHost test-import`n    HostName 1.2.3.4`n    User admin`n"@ > /tmp/sk_test_config
-    cargo run -- import -f /tmp/sk_test_config -y
-    -cargo run -- remove test-import -f
-    -rm /tmp/sk_test_config
+    $f = "$env:TEMP\sk_test_config"; "Host test-import`n    HostName 1.2.3.4`n    User admin`n" | Set-Content $f; cargo run -- import -f $f -y; -cargo run -- remove test-import -f; rm $f
 
 test-export: build
     cargo run -- export
     cargo run -- export -F json
-    cargo run -- export -o /tmp/sk_test_export.yaml
-    -rm /tmp/sk_test_export.yaml
+    $f = "$env:TEMP\sk_test_export.yaml"; cargo run -- export -o $f; rm $f
 
 test-doctor: build
     cargo run -- doctor
