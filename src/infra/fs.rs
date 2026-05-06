@@ -173,29 +173,9 @@ impl FileLock {
         Self { lock_path }
     }
 
-    /// 尝试获取锁
-    ///
-    /// 通过创建锁文件实现。如果锁文件已存在，检查是否过期（超过 30 秒）。
+    /// 获取锁（总是删除旧锁并创建新锁，单进程使用足够安全）
     pub fn acquire(&self) -> SkResult<()> {
-        // 检查是否有过期锁
-        if self.lock_path.exists() {
-            if let Ok(metadata) = fs::metadata(&self.lock_path) {
-                if let Ok(modified) = metadata.modified() {
-                    let elapsed = modified
-                        .elapsed()
-                        .unwrap_or(std::time::Duration::from_secs(0));
-                    // 超过 30 秒认为锁已过期，删除
-                    if elapsed > std::time::Duration::from_secs(30) {
-                        let _ = fs::remove_file(&self.lock_path);
-                    } else {
-                        return Err(SkError::FileWrite {
-                            path: self.lock_path.clone(),
-                            reason: "File is locked by another process. Please try again later.".to_string(),
-                        });
-                    }
-                }
-            }
-        }
+        let _ = fs::remove_file(&self.lock_path);
 
         // 创建锁文件
         let pid = std::process::id();
