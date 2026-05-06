@@ -32,7 +32,7 @@ stop-ssh:
 
 # 生成测试密钥对并推送到容器 (单行: powershell 变量不跨行共享)
 setup-key:
-    $k = "$env:USERPROFILE\.ssh\sk\keys\{{SERVER_NAME}}_key"; mkdir -Force (Split-Path $k) *>$null; ssh-keygen -t ed25519 -f $k -N '""' -C "sk-e2e" -q 2>$null; type "$k.pub" | podman exec -i {{CONTAINER_NAME}} bash -c "cat >> /home/{{SSH_USER}}/.ssh/authorized_keys"
+    $k = "$env:USERPROFILE\.sk\keys\{{SERVER_NAME}}_key"; mkdir -Force (Split-Path $k) *>$null; ssh-keygen -t ed25519 -f $k -N '""' -C "sk-e2e" -q 2>$null; type "$k.pub" | podman exec -i {{CONTAINER_NAME}} bash -c "cat >> /home/{{SSH_USER}}/.ssh/authorized_keys"
 
 # ---- 单元测试 ----
 test-unit:
@@ -59,13 +59,13 @@ test-remove-password:
 # =============================================================================
 
 test-add-key: build setup-key
-    cargo run -- add {{SERVER_NAME}}-key -H {{HOST_IP}} -u {{SSH_USER}} -P {{SSH_PORT}} -i "$env:USERPROFILE\.ssh\sk\keys\{{SERVER_NAME}}_key" -f
+    cargo run -- add {{SERVER_NAME}}-key -H {{HOST_IP}} -u {{SSH_USER}} -P {{SSH_PORT}} -i "$env:USERPROFILE\.sk\keys\{{SERVER_NAME}}_key" -f
 
 test-conn-key: build test-add-key
     cargo run -- test {{SERVER_NAME}}-key --timeout 15
 
 test-ssh-key: build setup-key test-add-key
-    ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 -i "$env:USERPROFILE\.ssh\sk\keys\{{SERVER_NAME}}_key" -p {{SSH_PORT}} {{SSH_USER}}@{{HOST_IP}} "echo KEY_AUTH_OK"
+    ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 -i "$env:USERPROFILE\.sk\keys\{{SERVER_NAME}}_key" -p {{SSH_PORT}} {{SSH_USER}}@{{HOST_IP}} "echo KEY_AUTH_OK"
 
 test-remove-key:
     cargo run -- remove {{SERVER_NAME}}-key -f
@@ -130,4 +130,4 @@ test-core: start-ssh test-unit test-help test-add-password test-conn-password te
 
 # ---- 清理 ----
 clean: stop-ssh
-    -rm -r -Force "$env:USERPROFILE\.ssh\sk\keys\{{SERVER_NAME}}_key*" *>$null
+    -rm -r -Force "$env:USERPROFILE\.sk\keys\{{SERVER_NAME}}_key*" *>$null

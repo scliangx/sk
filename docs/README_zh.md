@@ -186,10 +186,10 @@ sk batch add servers.csv -c 8 # 并发数
 ```
 ~/.ssh/
 ├── config              # 标准 SSH 配置（sk 读写 Host 块）
-└── sk/                 # sk 数据目录
-    ├── metadata.yaml   # 服务器元数据
-    ├── passwords/      # AES-256-GCM 加密密码 (*.enc)
-    └── keys/           # ED25519 密钥对 (name_key, name_key.pub)
+~/.sk/
+├── metadata.yaml       # 服务器元数据
+├── passwords/          # AES-256-GCM 加密密码 (*.enc)
+└── keys/               # ED25519 密钥对 (name_key, name_key.pub)
 ```
 
 **密码存储流程：**

@@ -25,9 +25,11 @@ pub fn ssh_config_path() -> SkResult<PathBuf> {
     Ok(ssh_dir()?.join("config"))
 }
 
-/// 获取 sk 数据目录 ~/.ssh/sk/
+/// 获取 sk 数据目录 ~/.sk/
 pub fn sk_dir() -> SkResult<PathBuf> {
-    Ok(ssh_dir()?.join("sk"))
+    let home = dirs::home_dir()
+        .ok_or_else(|| SkError::Internal("Cannot determine user HOME directory".to_string()))?;
+    Ok(home.join(".sk"))
 }
 
 /// 获取 sk 元数据文件路径 ~/.ssh/sk/metadata.yaml
@@ -247,7 +249,7 @@ pub fn read_file(path: &Path) -> SkResult<String> {
 
 /// 初始化 SSH 环境
 ///
-/// 确保 ~/.ssh/ 和 ~/.ssh/sk/ 子目录结构存在，且权限正确。
+/// 确保 ~/.ssh/ 和 ~/.sk/ 子目录结构存在。
 pub fn init_ssh_env() -> SkResult<()> {
     ensure_dir(&ssh_dir()?)?;
     ensure_dir(&sk_dir()?)?;

@@ -186,10 +186,10 @@ sk batch add servers.csv -c 8  # concurrency
 ```
 ~/.ssh/
 ├── config              # Standard SSH config (sk writes Host blocks)
-└── sk/                 # sk data directory
-    ├── metadata.yaml   # server metadata
-    ├── passwords/      # AES-256-GCM encrypted passwords (*.enc)
-    └── keys/           # ED25519 key pairs (name_key, name_key.pub)
+~/.sk/
+├── metadata.yaml       # server metadata
+├── passwords/          # AES-256-GCM encrypted passwords (*.enc)
+└── keys/               # ED25519 key pairs (name_key, name_key.pub)
 ```
 
 **Password storage flow:**

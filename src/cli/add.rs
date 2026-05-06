@@ -121,7 +121,7 @@ pub fn run(
         let spinner = progress::create_spinner("Generating ED25519 key pair...");
         let key_pair = KeyGenerator::generate_and_save(name)?;
         spinner.finish_and_clear();
-        let kp = format!("~/.ssh/sk/keys/{}_key", name);
+        let kp = format!("~/.sk/keys/{}_key", name);
         output.info(&format!("Key generated: {}", kp));
 
         let name_owned = name.to_string();
