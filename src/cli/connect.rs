@@ -154,8 +154,10 @@ fn native_ssh_session(
         .channel_session()
         .map_err(|e| SkError::Internal(format!("Channel error: {}", e)))?;
 
+    let term = std::env::var("TERM").unwrap_or_else(|_| "xterm-256color".to_string());
+    let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
     channel
-        .request_pty("xterm-256color", None, Some((80, 24, 0, 0)))
+        .request_pty(&term, None, Some((cols as u32, rows as u32, 0, 0)))
         .map_err(|e| SkError::Internal(format!("PTY error: {}", e)))?;
 
     channel
@@ -194,20 +196,26 @@ fn run_interactive_session(channel: &mut ssh2::Channel) -> SkResult<()> {
             Err(_) => break,
         }
 
-        // keyboard event → channel（crossterm 事件驱动，无缓冲）
+        // crossterm event → channel
         if event::poll(Duration::from_millis(5)).unwrap_or(false) {
-            if let Ok(Event::Key(key)) = event::read() {
-                if key.kind == KeyEventKind::Release { continue; }
+            match event::read() {
+                Ok(Event::Key(key)) => {
+                    if key.kind == KeyEventKind::Release { continue; }
 
-                let mut send = [0u8; 16];
-                let n = key_event_to_bytes(&key, &mut send);
-                if n > 0 {
-                    match channel.write_all(&send[..n]) {
-                        Ok(()) => {}
-                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
-                        Err(_) => break,
+                    let mut send = [0u8; 16];
+                    let n = key_event_to_bytes(&key, &mut send);
+                    if n > 0 {
+                        match channel.write_all(&send[..n]) {
+                            Ok(()) => {}
+                            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                            Err(_) => break,
+                        }
                     }
                 }
+                Ok(Event::Resize(cols, rows)) => {
+                    let _ = channel.request_pty_size(cols as u32, rows as u32, None, None);
+                }
+                _ => {}
             }
         }
 

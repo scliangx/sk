@@ -65,10 +65,8 @@ impl MetadataManager {
     pub fn load(path: &Path) -> SkResult<Self> {
         let metadata = if path.exists() {
             let content = fs::read_file(path)?;
-            serde_yaml::from_str(&content).map_err(|e| SkError::Config(format!(
-                "Metadata file format error: {}",
-                e
-            )))?
+            serde_yaml::from_str(&content)
+                .map_err(|e| SkError::Config(format!("Metadata file format error: {}", e)))?
         } else {
             // 文件不存在，创建空的元数据
             SkMetadata {
@@ -85,12 +83,7 @@ impl MetadataManager {
     }
 
     /// 添加或更新服务器元数据
-    pub fn upsert_server(
-        &mut self,
-        name: &str,
-        password_stored: bool,
-        password_backend: &str,
-    ) {
+    pub fn upsert_server(&mut self, name: &str, password_stored: bool, password_backend: &str) {
         self.metadata.servers.insert(
             name.to_string(),
             ServerMetadata {
@@ -135,11 +128,9 @@ impl MetadataManager {
     pub fn save(&mut self) -> SkResult<()> {
         self.metadata.last_modified = Local::now();
 
-        let content = serde_yaml::to_string(&self.metadata).map_err(|e| {
-            SkError::FileWrite {
-                path: self.path.clone(),
-                reason: format!("Failed to serialize metadata: {}", e),
-            }
+        let content = serde_yaml::to_string(&self.metadata).map_err(|e| SkError::FileWrite {
+            path: self.path.clone(),
+            reason: format!("Failed to serialize metadata: {}", e),
         })?;
 
         fs::atomic_write(&self.path, &content)?;
@@ -248,11 +239,7 @@ mod tests {
         manager.upsert_server("alpha", false, "none");
         manager.upsert_server("beta", false, "none");
 
-        let mut names: Vec<&str> = manager
-            .server_names()
-            .iter()
-            .map(|s| s.as_str())
-            .collect();
+        let mut names: Vec<&str> = manager.server_names().iter().map(|s| s.as_str()).collect();
         names.sort();
 
         assert_eq!(names, vec!["alpha", "beta"]);
